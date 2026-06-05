@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Live Tether</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&display=swap" rel="stylesheet" />
+<style>
+  /* ── Design tokens ──────────────────────────────────────────────────── */
+  :root {
+    --bg:        #080a0c;
+    --surface:   #0f1318;
+    --border:    #1e2530;
+    --accent:    #e8c84a;   /* amber/gold — camera aesthetic */
+    --accent2:   #3a8fe8;   /* electric blue for status */
+    --text:      #c8d0db;
+    --dim:       #5a6270;
+    --danger:    #e84a4a;
+    --green:     #4ae8a0;
+    --font-mono: 'DM Mono', monospace;
+    --font-disp: 'Bebas Neue', sans-serif;
+    --radius:    6px;
+    --trans:     cubic-bezier(.22,1,.36,1);
+  }
+
+  /* ── Reset ──────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--font-mono); font-size: 13px; }
+
+  /* ── Layout ─────────────────────────────────────────────────────────── */
+  #app {
+    display: grid;
+    grid-template-rows: 52px 1fr 160px;
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  /* ── Topbar ─────────────────────────────────────────────────────────── */
+  #topbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    z-index: 10;
+  }
+  #topbar .logo {
+    font-family: var(--font-disp);
+    font-size: 22px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  #topbar .logo span { color: var(--dim); }
+
+  .pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 99px;
+    border: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--dim);
+    white-space: nowrap;
+    transition: border-color .3s, color .3s;
+  }
+  .pill .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--dim);
+    transition: background .3s;
+    flex-shrink: 0;
+  }
+  .pill.connected { border-color: var(--green); color: var(--green); }
+  .pill.connected .dot { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+  .pill.disconnected { border-color: var(--danger); color: var(--danger); }
+  .pill.disconnected .dot { background: var(--danger); }
+  .pill.waiting { border-color: var(--accent); color: var(--accent); }
+  .pill.waiting .dot { background: var(--accent); animation: pulse 1s infinite; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .3; }
+  }
+
+  #topbar .spacer { flex: 1; }
+
+  #counter {
+    font-size: 11px;
+    color: var(--dim);
+    letter-spacing: 1px;
+  }
+  #counter strong { color: var(--text); }
+
+  /* ── Main preview ───────────────────────────────────────────────────── */
+  #preview-area {
+    position: relative;
+    overflow: hidden;
+    background: #050608;
+  }
+
+  /* Grid overlay — very subtle */
+  #preview-area::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  #main-img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: contain;
+    opacity: 0;
+    transform: scale(1.03);
+    transition: opacity .5s var(--trans), transform .5s var(--trans);
+    z-index: 2;
+  }
+  #main-img.visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  /* Placeholder / idle screen */
+  #idle {
+    position: absolute; inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 3;
+    pointer-events: none;
+    transition: opacity .4s;
+  }
+  #idle.hidden { opacity: 0; }
+
+  #idle .icon {
+    width: 64px; height: 64px;
+    opacity: .15;
+  }
+  #idle p {
+    font-family: var(--font-disp);
+    font-size: 28px;
+    letter-spacing: 6px;
+    color: var(--dim);
+  }
+  #idle small {
+    font-size: 11px;
+    color: var(--dim);
+    opacity: .6;
+    letter-spacing: 2px;
+  }
+
+  /* Flash animation on new photo */
+  #flash {
+    position: absolute; inset: 0;
+    background: white;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 5;
+  }
+  #flash.fire { animation: flashAnim .4s ease-out forwards; }
+  @keyframes flashAnim {
+    0%   { opacity: .45; }
+    100% { opacity: 0; }
+  }
+
+  /* Top-right info overlay */
+  #overlay-info {
+    position: absolute;
+    top: 14px; right: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+    z-index: 4;
+    pointer-events: none;
+  }
+  .tag {
+    background: rgba(8,10,12,.75);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(8px);
+    padding: 3px 9px;
+    border-radius: var(--radius);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: var(--dim);
+    text-transform: uppercase;
+  }
+  #filename-tag { color: var(--accent); border-color: rgba(232,200,74,.25); }
+
+  /* ── Filmstrip ──────────────────────────────────────────────────────── */
+  #filmstrip-wrap {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  #filmstrip-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 14px 0;
+    flex-shrink: 0;
+  }
+  #filmstrip-header .label {
+    font-family: var(--font-disp);
+    font-size: 13px;
+    letter-spacing: 3px;
+    color: var(--dim);
+  }
+  #filmstrip-header .count {
+    font-size: 10px;
+    color: var(--dim);
+    margin-left: auto;
+  }
+
+  #filmstrip {
+    display: flex;
+    gap: 8px;
+    padding: 8px 14px 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex: 1;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+  #filmstrip::-webkit-scrollbar { height: 4px; }
+  #filmstrip::-webkit-scrollbar-track { background: transparent; }
+  #filmstrip::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .thumb {
+    flex-shrink: 0;
+    width: 106px;
+    height: 80px;
+    border-radius: var(--radius);
+    border: 1.5px solid var(--border);
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+    transition: border-color .2s, transform .2s var(--trans);
+    background: var(--bg);
+  }
+  .thumb:hover { border-color: var(--accent); transform: scale(1.05); }
+  .thumb.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(232,200,74,.3); }
+  .thumb img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: opacity .3s;
+  }
+
+  /* "NEW" badge */
+  .thumb .badge {
+    position: absolute;
+    top: 4px; left: 4px;
+    background: var(--accent);
+    color: #000;
+    font-size: 8px;
+    font-weight: 500;
+    padding: 1px 5px;
+    border-radius: 3px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    animation: badgeFade 3s forwards;
+  }
+  @keyframes badgeFade {
+    0%, 60% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* ── Download toast ─────────────────────────────────────────────────── */
+  #toast-container {
+    position: fixed;
+    bottom: 176px;
+    right: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 100;
+    pointer-events: none;
+  }
+  .toast {
+    background: var(--surface);
+    border: 1px solid var(--green);
+    color: var(--green);
+    padding: 9px 14px;
+    border-radius: var(--radius);
+    font-size: 11px;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: toastIn .3s var(--trans), toastOut .3s var(--trans) 3.5s forwards;
+    backdrop-filter: blur(8px);
+    max-width: 260px;
+  }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes toastOut {
+    from { opacity: 1; transform: translateX(0); }
+    to   { opacity: 0; transform: translateX(20px); }
+  }
+
+  /* ── Auto-download toggle ───────────────────────────────────────────── */
+  #auto-dl-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+  #auto-dl-wrap label {
+    font-size: 10px;
+    color: var(--dim);
+    letter-spacing: 1px;
+    cursor: pointer;
+  }
+  #auto-dl-toggle {
+    appearance: none;
+    width: 32px; height: 18px;
+    border-radius: 9px;
+    background: var(--border);
+    cursor: pointer;
+    position: relative;
+    transition: background .25s;
+    flex-shrink: 0;
+  }
+  #auto-dl-toggle::after {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--dim);
+    transition: transform .25s, background .25s;
+  }
+  #auto-dl-toggle:checked { background: rgba(78,232,160,.25); }
+  #auto-dl-toggle:checked::after { transform: translateX(14px); background: var(--green); }
+
+  /* ── Responsive tweaks ──────────────────────────────────────────────── */
+  @media (max-width: 600px) {
+    #topbar .logo { font-size: 18px; letter-spacing: 2px; }
+    #counter { display: none; }
+    #idle p { font-size: 20px; }
+    .thumb { width: 88px; height: 66px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Topbar ──────────────────────────────────────────────────────────── -->
+  <header id="topbar">
+    <div class="logo">LIVE<span>·</span>TETHER</div>
+
+    <div class="pill" id="ws-status">
+      <div class="dot"></div>
+      <span id="ws-label">CONNECTING</span>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div id="auto-dl-wrap">
+      <label for="auto-dl-toggle">AUTO-DL</label>
+      <input type="checkbox" id="auto-dl-toggle" checked title="Automatically download each incoming photo" />
+    </div>
+
+    <div id="counter"><strong id="photo-count">0</strong> PHOTOS</div>
+  </header>
+
+  <!-- ── Main preview ────────────────────────────────────────────────────── -->
+  <main id="preview-area">
+    <!-- Idle placeholder -->
+    <div id="idle">
+      <!-- Camera SVG icon -->
+      <svg class="icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="4" y="16" width="56" height="38" rx="5" stroke="currentColor" stroke-width="2.5"/>
+        <circle cx="32" cy="35" r="10" stroke="currentColor" stroke-width="2.5"/>
+        <circle cx="32" cy="35" r="4" stroke="currentColor" stroke-width="2"/>
+        <path d="M22 16l3-6h18l3 6" stroke="currentColor" stroke-width="2.5"/>
+        <circle cx="52" cy="23" r="2" fill="currentColor"/>
+      </svg>
+      <p>AWAITING CAMERA</p>
+      <small>TAKE A PHOTO TO BEGIN</small>
+    </div>
+
+    <!-- Live image -->
+    <img id="main-img" src="" alt="Latest photo" draggable="false" />
+
+    <!-- Info overlay -->
+    <div id="overlay-info">
+      <div class="tag" id="filename-tag" style="display:none"></div>
+      <div class="tag" id="time-tag" style="display:none"></div>
+    </div>
+
+    <!-- Flash FX -->
+    <div id="flash"></div>
+  </main>
+
+  <!-- ── Filmstrip ───────────────────────────────────────────────────────── -->
+  <div id="filmstrip-wrap">
+    <div id="filmstrip-header">
+      <span class="label">ROLL</span>
+      <span class="count" id="strip-count">—</span>
+    </div>
+    <div id="filmstrip"></div>
+  </div>
+
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ── Refs ──────────────────────────────────────────────────────────────────
+  const mainImg       = document.getElementById("main-img");
+  const idle          = document.getElementById("idle");
+  const flash         = document.getElementById("flash");
+  const wsPill        = document.getElementById("ws-status");
+  const wsLabel       = document.getElementById("ws-label");
+  const filmstrip     = document.getElementById("filmstrip");
+  const stripCount    = document.getElementById("strip-count");
+  const photoCount    = document.getElementById("photo-count");
+  const filenameTag   = document.getElementById("filename-tag");
+  const timeTag       = document.getElementById("time-tag");
+  const toastCont     = document.getElementById("toast-container");
+  const autoDlToggle  = document.getElementById("auto-dl-toggle");
+
+  let totalPhotos = 0;
+
+  // ── WebSocket bootstrap ───────────────────────────────────────────────────
+  // Dynamically use the same host the page was loaded from
+  const WS_URL = `ws://${location.host}`;
+  let ws, reconnectTimer;
+
+  function connect() {
+    setStatus("connecting");
+    ws = new WebSocket(WS_URL);
+
+    ws.addEventListener("open", () => {
+      setStatus("connected");
+      clearTimeout(reconnectTimer);
+    });
+
+    ws.addEventListener("message", (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === "new_photo") handleNewPhoto(msg);
+      } catch { /* ignore malformed */ }
+    });
+
+    ws.addEventListener("close", () => {
+      setStatus("disconnected");
+      reconnectTimer = setTimeout(connect, 3000);
+    });
+
+    ws.addEventListener("error", () => {
+      ws.close();
+    });
+  }
+
+  function setStatus(state) {
+    wsPill.className = "pill " + (
+      state === "connected"    ? "connected"    :
+      state === "connecting"   ? "waiting"      :
+                                 "disconnected"
+    );
+    wsLabel.textContent =
+      state === "connected"    ? "LIVE"          :
+      state === "connecting"   ? "CONNECTING…"  :
+                                 "RECONNECTING…";
+  }
+
+  // ── Load history on page open ─────────────────────────────────────────────
+  async function loadHistory() {
+    try {
+      const photos = await fetch("/api/photos").then(r => r.json());
+      if (!photos.length) return;
+      // Show thumbnails oldest → newest (strip shows newest at left after we unshift)
+      photos.slice().reverse().forEach((p, i) => {
+        addThumb(p.url, p.name, i === photos.length - 1 /* last = newest = active */);
+      });
+      // Show most recent in main view (no auto-download for history)
+      const newest = photos[0];
+      showInMain(newest.url, newest.name, false);
+      totalPhotos = photos.length;
+      updateCounts();
+    } catch { /* server not ready yet */ }
+  }
+
+  // ── Handle incoming photo event ───────────────────────────────────────────
+  function handleNewPhoto({ url, filename }) {
+    totalPhotos++;
+    updateCounts();
+
+    triggerFlash();
+    showInMain(url, filename, true);
+    addThumb(url, filename, true, true);
+
+    if (autoDlToggle.checked) {
+      triggerDownload(url, filename);
+    }
+  }
+
+  function showInMain(url, filename, animate) {
+    mainImg.classList.remove("visible");
+    idle.classList.add("hidden");
+
+    setTimeout(() => {
+      mainImg.src = url;
+      mainImg.onload = () => mainImg.classList.add("visible");
+    }, animate ? 80 : 0);
+
+    filenameTag.textContent = filename;
+    filenameTag.style.display = "";
+    const now = new Date();
+    timeTag.textContent = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    timeTag.style.display = "";
+  }
+
+  // ── Filmstrip ─────────────────────────────────────────────────────────────
+  function addThumb(url, filename, active, isNew = false) {
+    // Deactivate all
+    filmstrip.querySelectorAll(".thumb").forEach(t => t.classList.remove("active"));
+
+    const div = document.createElement("div");
+    div.className = "thumb" + (active ? " active" : "");
+    div.title = filename;
+
+    const img = document.createElement("img");
+    img.src = url;
+    img.alt = filename;
+    img.loading = "lazy";
+    div.appendChild(img);
+
+    if (isNew) {
+      const badge = document.createElement("div");
+      badge.className = "badge";
+      badge.textContent = "NEW";
+      div.appendChild(badge);
+    }
+
+    div.addEventListener("click", () => {
+      filmstrip.querySelectorAll(".thumb").forEach(t => t.classList.remove("active"));
+      div.classList.add("active");
+      showInMain(url, filename, false);
+    });
+
+    // Prepend so newest is on the left
+    filmstrip.prepend(div);
+    filmstrip.scrollLeft = 0;
+    updateCounts();
+  }
+
+  function updateCounts() {
+    const n = filmstrip.querySelectorAll(".thumb").length;
+    stripCount.textContent = n + " FRAME" + (n === 1 ? "" : "S");
+    photoCount.textContent = totalPhotos;
+  }
+
+  // ── Auto-download ─────────────────────────────────────────────────────────
+  function triggerDownload(url, filename) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    // Give the browser a moment before cleanup
+    setTimeout(() => document.body.removeChild(a), 2000);
+    showToast(`↓ ${filename}`);
+  }
+
+  // ── Toast ─────────────────────────────────────────────────────────────────
+  function showToast(msg) {
+    const t = document.createElement("div");
+    t.className = "toast";
+    t.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg> ${msg}`;
+    toastCont.appendChild(t);
+    setTimeout(() => t.remove(), 4000);
+  }
+
+  // ── Flash FX ──────────────────────────────────────────────────────────────
+  function triggerFlash() {
+    flash.classList.remove("fire");
+    void flash.offsetWidth; // reflow to restart animation
+    flash.classList.add("fire");
+  }
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+  loadHistory();
+  connect();
+})();
+</script>
+</body>
+</html>
