@@ -1,12 +1,3 @@
-/**
- * Sony Camera Live Tether — server.js
- * ─────────────────────────────────────────────────────────────────────────────
- * Starts three services on your laptop:
- *   • FTP  server on port 2121  ← Sony camera sends photos here
- *   • HTTP server on port 3000  ← Phones/tablets open this in a browser
- *   • WebSocket on port 3000    ← Pushes "new photo" events to every client
- */
-
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -18,15 +9,15 @@ import { createServer } from "http";
 import chokidar from "chokidar";
 import FtpSrv from "ftp-srv";
 
-// ─── Paths ────────────────────────────────────────────────────────────────────
+// ─── Paths ────────────────────────────────────────────────────────────
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PHOTOS_DIR = path.join(__dirname, "photos");
-const PUBLIC_DIR = path.join(__dirname, "public");
+const PUBLIC_DIR = __dirname;
 
 // Create required directories
-[PHOTOS_DIR, PUBLIC_DIR].forEach((d) => fs.mkdirSync(d, { recursive: true }));
+[PHOTOS_DIR].forEach((d) => fs.mkdirSync(d, { recursive: true }));
 
-// ─── Detect local IP ──────────────────────────────────────────────────────────
+// ─── Detect local IP ──────────────────────────────────────────────────────
 function getLocalIP() {
   const interfaces = os.networkInterfaces();
   for (const iface of Object.values(interfaces)) {
@@ -38,12 +29,16 @@ function getLocalIP() {
 }
 const LOCAL_IP = getLocalIP();
 
-// ─── Express + HTTP ───────────────────────────────────────────────────────────
+// ─── Express + HTTP ────────────────────────────────────────────────────────
 const app = express();
 const httpServer = createServer(app);
 
 app.use("/photos", express.static(PHOTOS_DIR));
 app.use(express.static(PUBLIC_DIR));
+
+app.get("/", (_req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
 
 // Health / info endpoint
 app.get("/api/status", (_req, res) => {
@@ -72,7 +67,7 @@ app.get("/api/photos", (_req, res) => {
   }
 });
 
-// ─── WebSocket ────────────────────────────────────────────────────────────────
+// ─── WebSocket ─────────────────────────────────────────────────────────────
 const wss = new WebSocketServer({ server: httpServer });
 
 function broadcast(data) {
@@ -92,7 +87,7 @@ wss.on("connection", (ws, req) => {
   );
 });
 
-// ─── File Watcher ─────────────────────────────────────────────────────────────
+// ─── File Watcher ────────────────────────────────────────────────────────
 // Waits until a file stops growing before broadcasting (handles slow transfers)
 const pendingFiles = new Map();
 
@@ -119,7 +114,7 @@ chokidar
     console.log(`[WS]  Broadcast → ${wss.clients.size} client(s)`);
   });
 
-// ─── FTP Server ───────────────────────────────────────────────────────────────
+// ─── FTP Server ────────────────────────────────────────────────────────────
 const ftpServer = new FtpSrv({
   url: `ftp://0.0.0.0:2121`,
   pasv_url: LOCAL_IP,       // PASV mode uses the real LAN IP
@@ -138,7 +133,7 @@ ftpServer.on("client-error", ({ connection, context, error }) => {
   console.error("[FTP] Client error:", error?.message ?? error);
 });
 
-// ─── Start everything ─────────────────────────────────────────────────────────
+// ─── Start everything ─────────────────────────────────────────────────────
 const HTTP_PORT = 3000;
 
 ftpServer.listen().then(() => {
