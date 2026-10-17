@@ -24,7 +24,7 @@
     --trans:     cubic-bezier(.22,1,.36,1);
   }
 
-  /* ── Reset ──────────────────────────────────────────────────────────── */
+  /* ── Reset ─────────────────────────────────────────────────────────── */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--font-mono); font-size: 13px; }
 
@@ -361,7 +361,7 @@
 <body>
 <div id="app">
 
-  <!-- ── Topbar ──────────────────────────────────────────────────────────── -->
+  <!-- ── Topbar ────────────────────────────────────────────────────────── -->
   <header id="topbar">
     <div class="logo">LIVE<span>·</span>TETHER</div>
 
@@ -427,7 +427,7 @@
 (() => {
   "use strict";
 
-  // ── Refs ──────────────────────────────────────────────────────────────────
+  // ── Refs ────────────────────────────────────────────────────────────
   const mainImg       = document.getElementById("main-img");
   const idle          = document.getElementById("idle");
   const flash         = document.getElementById("flash");
@@ -445,8 +445,13 @@
 
   // ── WebSocket bootstrap ───────────────────────────────────────────────────
   // Dynamically use the same host the page was loaded from
-  const WS_URL = `ws://${location.host}`;
+  const WS_URL = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`;
   let ws, reconnectTimer;
+
+  mainImg.onerror = () => {
+    idle.classList.remove("hidden");
+    mainImg.alt = "Image failed to load";
+  };
 
   function connect() {
     setStatus("connecting");
@@ -533,7 +538,7 @@
     timeTag.style.display = "";
   }
 
-  // ── Filmstrip ─────────────────────────────────────────────────────────────
+  // ── Filmstrip ──────────────────────────────────────────────────────────
   function addThumb(url, filename, active, isNew = false) {
     // Deactivate all
     filmstrip.querySelectorAll(".thumb").forEach(t => t.classList.remove("active"));
@@ -573,7 +578,7 @@
     photoCount.textContent = totalPhotos;
   }
 
-  // ── Auto-download ─────────────────────────────────────────────────────────
+  // ── Auto-download ────────────────────────────────────────────────────────
   function triggerDownload(url, filename) {
     const a = document.createElement("a");
     a.href = url;
@@ -586,7 +591,7 @@
     showToast(`↓ ${filename}`);
   }
 
-  // ── Toast ─────────────────────────────────────────────────────────────────
+  // ── Toast ────────────────────────────────────────────────────────────
   function showToast(msg) {
     const t = document.createElement("div");
     t.className = "toast";
@@ -595,14 +600,14 @@
     setTimeout(() => t.remove(), 4000);
   }
 
-  // ── Flash FX ──────────────────────────────────────────────────────────────
+  // ── Flash FX ──────────────────────────────────────────────────────────
   function triggerFlash() {
     flash.classList.remove("fire");
     void flash.offsetWidth; // reflow to restart animation
     flash.classList.add("fire");
   }
 
-  // ── Boot ──────────────────────────────────────────────────────────────────
+  // ── Boot ────────────────────────────────────────────────────────────
   loadHistory();
   connect();
 })();
