@@ -6,13 +6,18 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "lint": "eslint server.js",
+    "test": "node --check server.js"
   },
   "dependencies": {
     "chokidar": "^3.6.0",
     "express": "^4.19.2",
     "ftp-srv": "^4.6.2",
     "ws": "^8.17.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.15.0"
   },
   "engines": {
     "node": ">=18.0.0"

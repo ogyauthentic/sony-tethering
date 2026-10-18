@@ -12,8 +12,8 @@
     --bg:        #080a0c;
     --surface:   #0f1318;
     --border:    #1e2530;
-    --accent:    #e8c84a;   /* amber/gold — camera aesthetic */
-    --accent2:   #3a8fe8;   /* electric blue for status */
+    --accent:    #e8c84a;
+    --accent2:   #3a8fe8;
     --text:      #c8d0db;
     --dim:       #5a6270;
     --danger:    #e84a4a;
@@ -24,11 +24,23 @@
     --trans:     cubic-bezier(.22,1,.36,1);
   }
 
-  /* ── Reset ─────────────────────────────────────────────────────────── */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--font-mono); font-size: 13px; }
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    overscroll-behavior: none;
+  }
 
-  /* ── Layout ─────────────────────────────────────────────────────────── */
+  body {
+    background:
+      radial-gradient(circle at top, rgba(58, 143, 232, 0.09), transparent 28%),
+      linear-gradient(180deg, #080a0c 0%, #0b0d11 100%);
+  }
+
   #app {
     display: grid;
     grid-template-rows: 52px 1fr 160px;
@@ -36,14 +48,14 @@
     height: 100dvh;
   }
 
-  /* ── Topbar ─────────────────────────────────────────────────────────── */
   #topbar {
     display: flex;
     align-items: center;
     gap: 16px;
     padding: 0 20px;
     border-bottom: 1px solid var(--border);
-    background: var(--surface);
+    background: rgba(15, 19, 24, 0.92);
+    backdrop-filter: blur(10px);
     position: relative;
     z-index: 10;
   }
@@ -96,14 +108,12 @@
   }
   #counter strong { color: var(--text); }
 
-  /* ── Main preview ───────────────────────────────────────────────────── */
   #preview-area {
     position: relative;
     overflow: hidden;
     background: #050608;
   }
 
-  /* Grid overlay — very subtle */
   #preview-area::before {
     content: '';
     position: absolute; inset: 0;
@@ -115,6 +125,15 @@
     z-index: 1;
   }
 
+  #preview-area::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,0.10), rgba(0,0,0,0.12));
+    pointer-events: none;
+    z-index: 2;
+  }
+
   #main-img {
     position: absolute; inset: 0;
     width: 100%; height: 100%;
@@ -122,14 +141,15 @@
     opacity: 0;
     transform: scale(1.03);
     transition: opacity .5s var(--trans), transform .5s var(--trans);
-    z-index: 2;
+    z-index: 3;
+    filter: saturate(1.1) contrast(1.05);
+    background: linear-gradient(180deg, rgba(8,10,12,.9), rgba(8,10,12,.75));
   }
   #main-img.visible {
     opacity: 1;
     transform: scale(1);
   }
 
-  /* Placeholder / idle screen */
   #idle {
     position: absolute; inset: 0;
     display: flex;
@@ -137,9 +157,10 @@
     align-items: center;
     justify-content: center;
     gap: 16px;
-    z-index: 3;
+    z-index: 4;
     pointer-events: none;
     transition: opacity .4s;
+    background: radial-gradient(circle at center, rgba(232,200,74,0.06), transparent 30%);
   }
   #idle.hidden { opacity: 0; }
 
@@ -160,13 +181,12 @@
     letter-spacing: 2px;
   }
 
-  /* Flash animation on new photo */
   #flash {
     position: absolute; inset: 0;
     background: white;
     opacity: 0;
     pointer-events: none;
-    z-index: 5;
+    z-index: 6;
   }
   #flash.fire { animation: flashAnim .4s ease-out forwards; }
   @keyframes flashAnim {
@@ -174,7 +194,6 @@
     100% { opacity: 0; }
   }
 
-  /* Top-right info overlay */
   #overlay-info {
     position: absolute;
     top: 14px; right: 14px;
@@ -182,7 +201,7 @@
     flex-direction: column;
     align-items: flex-end;
     gap: 5px;
-    z-index: 4;
+    z-index: 7;
     pointer-events: none;
   }
   .tag {
@@ -195,13 +214,13 @@
     letter-spacing: 1.5px;
     color: var(--dim);
     text-transform: uppercase;
+    font-weight: 500;
   }
   #filename-tag { color: var(--accent); border-color: rgba(232,200,74,.25); }
 
-  /* ── Filmstrip ──────────────────────────────────────────────────────── */
   #filmstrip-wrap {
     border-top: 1px solid var(--border);
-    background: var(--surface);
+    background: rgba(15, 19, 24, 0.92);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -260,7 +279,6 @@
     transition: opacity .3s;
   }
 
-  /* "NEW" badge */
   .thumb .badge {
     position: absolute;
     top: 4px; left: 4px;
@@ -279,7 +297,6 @@
     100% { opacity: 0; }
   }
 
-  /* ── Download toast ─────────────────────────────────────────────────── */
   #toast-container {
     position: fixed;
     bottom: 176px;
@@ -314,7 +331,6 @@
     to   { opacity: 0; transform: translateX(20px); }
   }
 
-  /* ── Auto-download toggle ───────────────────────────────────────────── */
   #auto-dl-wrap {
     display: flex;
     align-items: center;
@@ -348,8 +364,8 @@
   }
   #auto-dl-toggle:checked { background: rgba(78,232,160,.25); }
   #auto-dl-toggle:checked::after { transform: translateX(14px); background: var(--green); }
+  #auto-dl-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-  /* ── Responsive tweaks ──────────────────────────────────────────────── */
   @media (max-width: 600px) {
     #topbar .logo { font-size: 18px; letter-spacing: 2px; }
     #counter { display: none; }
@@ -361,7 +377,6 @@
 <body>
 <div id="app">
 
-  <!-- ── Topbar ────────────────────────────────────────────────────────── -->
   <header id="topbar">
     <div class="logo">LIVE<span>·</span>TETHER</div>
 
@@ -380,11 +395,8 @@
     <div id="counter"><strong id="photo-count">0</strong> PHOTOS</div>
   </header>
 
-  <!-- ── Main preview ────────────────────────────────────────────────────── -->
   <main id="preview-area">
-    <!-- Idle placeholder -->
     <div id="idle">
-      <!-- Camera SVG icon -->
       <svg class="icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
         <rect x="4" y="16" width="56" height="38" rx="5" stroke="currentColor" stroke-width="2.5"/>
         <circle cx="32" cy="35" r="10" stroke="currentColor" stroke-width="2.5"/>
@@ -396,20 +408,16 @@
       <small>TAKE A PHOTO TO BEGIN</small>
     </div>
 
-    <!-- Live image -->
     <img id="main-img" src="" alt="Latest photo" draggable="false" />
 
-    <!-- Info overlay -->
     <div id="overlay-info">
       <div class="tag" id="filename-tag" style="display:none"></div>
       <div class="tag" id="time-tag" style="display:none"></div>
     </div>
 
-    <!-- Flash FX -->
     <div id="flash"></div>
   </main>
 
-  <!-- ── Filmstrip ───────────────────────────────────────────────────────── -->
   <div id="filmstrip-wrap">
     <div id="filmstrip-header">
       <span class="label">ROLL</span>
@@ -420,14 +428,12 @@
 
 </div>
 
-<!-- Toast container -->
 <div id="toast-container"></div>
 
 <script>
 (() => {
   "use strict";
 
-  // ── Refs ────────────────────────────────────────────────────────────
   const mainImg       = document.getElementById("main-img");
   const idle          = document.getElementById("idle");
   const flash         = document.getElementById("flash");
@@ -443,8 +449,6 @@
 
   let totalPhotos = 0;
 
-  // ── WebSocket bootstrap ───────────────────────────────────────────────────
-  // Dynamically use the same host the page was loaded from
   const WS_URL = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`;
   let ws, reconnectTimer;
 
@@ -491,16 +495,13 @@
                                  "RECONNECTING…";
   }
 
-  // ── Load history on page open ─────────────────────────────────────────────
   async function loadHistory() {
     try {
       const photos = await fetch("/api/photos").then(r => r.json());
       if (!photos.length) return;
-      // Show thumbnails oldest → newest (strip shows newest at left after we unshift)
       photos.slice().reverse().forEach((p, i) => {
-        addThumb(p.url, p.name, i === photos.length - 1 /* last = newest = active */);
+        addThumb(p.url, p.name, i === photos.length - 1);
       });
-      // Show most recent in main view (no auto-download for history)
       const newest = photos[0];
       showInMain(newest.url, newest.name, false);
       totalPhotos = photos.length;
@@ -508,7 +509,6 @@
     } catch { /* server not ready yet */ }
   }
 
-  // ── Handle incoming photo event ───────────────────────────────────────────
   function handleNewPhoto({ url, filename }) {
     totalPhotos++;
     updateCounts();
@@ -538,9 +538,7 @@
     timeTag.style.display = "";
   }
 
-  // ── Filmstrip ──────────────────────────────────────────────────────────
   function addThumb(url, filename, active, isNew = false) {
-    // Deactivate all
     filmstrip.querySelectorAll(".thumb").forEach(t => t.classList.remove("active"));
 
     const div = document.createElement("div");
@@ -566,7 +564,6 @@
       showInMain(url, filename, false);
     });
 
-    // Prepend so newest is on the left
     filmstrip.prepend(div);
     filmstrip.scrollLeft = 0;
     updateCounts();
@@ -578,7 +575,6 @@
     photoCount.textContent = totalPhotos;
   }
 
-  // ── Auto-download ────────────────────────────────────────────────────────
   function triggerDownload(url, filename) {
     const a = document.createElement("a");
     a.href = url;
@@ -586,12 +582,10 @@
     a.style.display = "none";
     document.body.appendChild(a);
     a.click();
-    // Give the browser a moment before cleanup
     setTimeout(() => document.body.removeChild(a), 2000);
     showToast(`↓ ${filename}`);
   }
 
-  // ── Toast ────────────────────────────────────────────────────────────
   function showToast(msg) {
     const t = document.createElement("div");
     t.className = "toast";
@@ -600,14 +594,12 @@
     setTimeout(() => t.remove(), 4000);
   }
 
-  // ── Flash FX ──────────────────────────────────────────────────────────
   function triggerFlash() {
     flash.classList.remove("fire");
-    void flash.offsetWidth; // reflow to restart animation
+    void flash.offsetWidth;
     flash.classList.add("fire");
   }
 
-  // ── Boot ────────────────────────────────────────────────────────────
   loadHistory();
   connect();
 })();
